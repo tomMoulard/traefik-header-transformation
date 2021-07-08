@@ -128,18 +128,19 @@ func TestHeaderRules(t *testing.T) {
 			},
 		},
 		{
-			name: "[Join] Join two headers simple value",
+			name: "[Set] Join headers simple value (same as set)",
 			rule: plug.Rule{
-				Type:   "Join",
+				Type:   "Set",
 				Sep:    ",",
 				Header: "X-Test",
 				Values: []string{
+					"Bar",
 					"Tested",
 				},
 			},
 			headers: map[string]string{
 				"Foo":    "Bar",
-				"X-Test": "Bar",
+				"X-Test": "Old",
 			},
 			want: map[string]string{
 				"Foo":    "Bar",
@@ -147,9 +148,9 @@ func TestHeaderRules(t *testing.T) {
 			},
 		},
 		{
-			name: "[Join] Join two headers multiple value",
+			name: "[Set] Join two headers multiple value",
 			rule: plug.Rule{
-				Type:   "Join",
+				Type:   "Set",
 				Sep:    ",",
 				Header: "X-Test",
 				Values: []string{
@@ -164,7 +165,149 @@ func TestHeaderRules(t *testing.T) {
 			},
 			want: map[string]string{
 				"Foo":    "Bar",
-				"X-Test": "Bar,Tested,Compiled,Working",
+				"X-Test": "Tested,Compiled,Working",
+			},
+		},
+		{
+			name: "[Rename] no transformation with HeaderPrefix",
+			rule: plug.Rule{
+				Type:         "Rename",
+				Header:       "not-existing",
+				Value:        "^unused",
+				HeaderPrefix: "^",
+			},
+			headers: map[string]string{
+				"Foo": "Bar",
+			},
+			want: map[string]string{
+				"Foo": "Bar",
+			},
+		},
+		{
+			name: "[Rename] one transformation",
+			rule: plug.Rule{
+				Type:         "Rename",
+				Header:       "Test",
+				Value:        "^X-Dest-Header",
+				HeaderPrefix: "^",
+			},
+			headers: map[string]string{
+				"Foo":           "Bar",
+				"Test":          "Success",
+				"X-Dest-Header": "X-Testing",
+			},
+			want: map[string]string{
+				"Foo":           "Bar",
+				"X-Dest-Header": "X-Testing",
+				"X-Testing":     "Success",
+			},
+		},
+		{
+			name: "[Set] new header from existing",
+			rule: plug.Rule{
+				Type:         "Set",
+				Header:       "X-Test",
+				Value:        "^X-Source",
+				HeaderPrefix: "^",
+			},
+			headers: map[string]string{
+				"Foo":      "Bar",
+				"X-Source": "SourceHeader",
+			},
+			want: map[string]string{
+				"Foo":      "Bar",
+				"X-Source": "SourceHeader",
+				"X-Test":   "SourceHeader",
+			},
+		},
+		{
+			name: "[Set] existing header from another existing",
+			rule: plug.Rule{
+				Type:         "Set",
+				Header:       "X-Test",
+				Value:        "^X-Source",
+				HeaderPrefix: "^",
+			},
+			headers: map[string]string{
+				"Foo":      "Bar",
+				"X-Source": "SourceHeader",
+				"X-Test":   "Initial",
+			},
+			want: map[string]string{
+				"Foo":      "Bar",
+				"X-Source": "SourceHeader",
+				"X-Test":   "SourceHeader",
+			},
+		},
+		{
+			name: "[Set] Join two headers simple value",
+			rule: plug.Rule{
+				Type:   "Set",
+				Sep:    ",",
+				Header: "X-Test",
+				Values: []string{
+					"^X-Source",
+				},
+				HeaderPrefix: "^",
+			},
+			headers: map[string]string{
+				"Foo":      "Bar",
+				"X-Source": "Tested",
+				"X-Test":   "Bar",
+			},
+			want: map[string]string{
+				"Foo":      "Bar",
+				"X-Source": "Tested",
+				"X-Test":   "Tested",
+			},
+		},
+		{
+			name: "[Set] Join two headers multiple value",
+			rule: plug.Rule{
+				Type:   "Set",
+				Sep:    ",",
+				Header: "X-Test",
+				Values: []string{
+					"^X-Source-1",
+					"Compiled",
+					"^X-Source-3",
+				},
+				HeaderPrefix: "^",
+			},
+			headers: map[string]string{
+				"Foo":        "Bar",
+				"X-Test":     "Bar",
+				"X-Source-1": "Tested",
+				"X-Source-3": "Working",
+			},
+			want: map[string]string{
+				"Foo":        "Bar",
+				"X-Test":     "Tested,Compiled,Working",
+				"X-Source-1": "Tested",
+				"X-Source-3": "Working",
+			},
+		},
+		{
+			name: "[Set] Join two headers multiple value with itself",
+			rule: plug.Rule{
+				Type:   "Set",
+				Sep:    ",",
+				Header: "X-Test",
+				Values: []string{
+					"second",
+					"^X-Test",
+					"^X-Source-3",
+				},
+				HeaderPrefix: "^",
+			},
+			headers: map[string]string{
+				"Foo":        "Bar",
+				"X-Test":     "test",
+				"X-Source-3": "third",
+			},
+			want: map[string]string{
+				"Foo":    "Bar",
+				"X-Test": "second,test,third",
 			},
 		},
 	}

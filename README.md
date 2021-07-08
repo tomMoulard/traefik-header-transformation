@@ -1,8 +1,8 @@
-# Header transformation plugin for traefik
+# Header transformation plugin for Traefik
 
 [![Build Status](https://travis-ci.com/tomMoulard/htransformation.svg?branch=main)](https://travis-ci.com/tomMoulard/htransformation)
 
-This plugin allow to change on the fly header's value of a request.
+This plugin allows to change, on the fly, the header's value of a request.
 
 ## Dev `traefik.yml` configuration file for traefik
 
@@ -31,25 +31,29 @@ providers:
 ```
 
 ## How to dev
+
 ```bash
 $ docker run -d --network host containous/whoami -port 5000
 # traefik --config-file traefik.yml
 ```
+
 ## How to use
 
-To choose a Rule you have to fill the `Type` field with either
+To choose a Rule you have to fill the `Type` field with one of the following:
+
 - 'Rename'  : to rename a header
 - 'Set'     : to Set a header
 - 'Del'     : to Delete a header
-- 'Join'    : to Join values on a header
 
 Each Rule can be named with the `Name` field
 
 ### Rename
 
-A Rename rule need 2 arguments
+A Rule Rename needs two arguments and optionally the third.
+
 - `Header`, the regex of the header you want to replace
 - `Value`, the new header
+- `HeaderPrefix`, the prefix to denote the new Header name is to be taken from another header value
 
 ```yaml
 # Example Rename
@@ -59,6 +63,7 @@ A Rename rule need 2 arguments
       Value: 'NewHeader'
       Type: 'Rename'
 ```
+
 ```yaml
 # Old header:
 Cache-Control: gzip, deflate
@@ -74,6 +79,7 @@ NewHeader: gzip, deflate
       Value: 'X-Traefik-merged'
       Type: 'Rename'
 ```
+
 ```yaml
 # Old header:
 X-Traefik-uuid: 0
@@ -84,28 +90,99 @@ X-Traefik-merged: 0 # A value from old headers
 
 ### Set
 
-A Set rule will either create or replace the header and value (if it already exist)
+A Set rule will either create or replace the header and value (if it already exists), appending multiple values with the separator if specified.
 
-A rule Set need 2 arguments
+A Rule Set needs the first two arguments, and optionally the next three.
+`Value` can be skipped if specifying `Values`.
+
 - `Header`, the header you want to create
 - `Value`, the value of the new header
+- `Values`, a list of values to add
+- `Sep`, the separator you want to use
+- `HeaderPrefix`, the prefix to denote the Value is to be taken from another header
 
 ```yaml
-# Example Join
+# Example Set
 - Rule:
       Name: 'Set Cache-Control'
       Header: 'Cache-Control'
       Value: 'Foo'
-      Type: 'Join'
+      Type: 'Set'
 ```
+
 ```yaml
 # New header:
 Cache-Control: Foo
 ```
 
+```yaml
+# Example Usage
+- Rule:
+  Name: 'Header set'
+  Header: 'X-Forwarded-For'
+  Value: '^CF-Connecting-IP'
+  HeaderPrefix: "^"
+  Type: 'Set'
+```
+
+```yaml
+# Old header:
+CF-Connecting-IP: 1.1.1.1
+
+# New headers:
+CF-Connecting-IP: 1.1.1.1
+X-Forwarded-For: 1.1.1.1
+```
+
+```yaml
+# Example Usage
+- Rule:
+  Name: 'Header XFF'
+  Header: 'X-Forwarded-For'
+  Value: '^CF-Connecting-IP'
+  Values:
+    - '^X-Forwarded-For'
+    - '192.168.0.1'
+  Sep: ', '
+  HeaderPrefix: "^"
+  Type: 'Set'
+```
+
+```yaml
+# Old header:
+CF-Connecting-IP: 1.1.1.1
+X-Forwarded-For: 10.0.0.1, 10.10.10.1
+# New headers:
+CF-Connecting-IP: 1.1.1.1
+X-Forwarded-For: 1.1.1.1, 10.0.0.1, 10.10.10.1, 192.168.0.1
+```
+
+```yaml
+# Example Join
+- Rule:
+      Name: 'Header join'
+      Header: 'Cache-Control'
+      Sep: ','
+      HeaderPrefix: "^"
+      Values:
+        - '^Cache-Control'
+        - 'Foo'
+        - 'Bar'
+      Type: 'Set'
+```
+
+```yaml
+# Old header:
+Cache-Control: gzip, deflate
+
+# Joined header:
+Cache-Control: gzip, deflate,Foo,Bar
+```
+
 ### Delete
 
-A rule Delete need 1 arguments
+A Rule Delete needs only one argument
+
 - `Header`, the header you want to delete
 
 ```yaml
@@ -116,36 +193,7 @@ A rule Delete need 1 arguments
       Type: 'Del'
 ```
 
-
-### Join
-
-A Join rule will concat the values of the existing header with the new one. If the header doesnt exist, it'll do nothing 
-
-It needs 3 arguments
-- `Header`, the header you want to join
-- `Values`, a list of values to add to the existing header
-- `Sep`, the separator you want to use
-
-```yaml
-# Example Join
-- Rule:
-      Name: 'Header join'
-      Header: 'Cache-Control'
-      Sep: ','
-      Values:
-        - 'Foo'
-        - 'Bar'
-      Type: 'Join'
-```
-```yaml
-# Old header:
-Cache-Control: gzip, deflate
-
-# Joined header:
-Cache-Control: gzip, deflate,Foo,Bar
-```
-
-### Careful
+### Point to note
 
 The rules will be evaluated in the order of definition
 
@@ -166,7 +214,8 @@ The rules will be evaluated in the order of definition
   Value: 'False'
   Type: 'Set'
 ```
-Will firstly set the header `X-Custom-2` to 'True', then delete it and lastly set it again but with `False`
+
+This will firstly set the header `X-Custom-2` to 'True', then delete it and finally set it again but with `False`
 
 # Authors
 | Tom Moulard | Clément David | Martin Huvelle | Alexandre Bossut-Lasry |
